@@ -2,6 +2,10 @@ setwd("C:/Users/acher/crypto/")
 sd1="2022-01-01"
 sd2="2023-12-31"
 
+library(ggplot2)
+library(dplyr)
+library(stargazer)
+
 coiner<-function(coin,start_date,stop_date){
   df=read.csv(paste(coin,'.csv',sep=''))
   names(df)[names(df) == "time"] <- "date"
@@ -110,15 +114,86 @@ cor(new_df,use = "complete.obs")
 cor(new_df2,use = "complete.obs")
 
 
-model = lm(DgRet ~ BTCRV+JD+DgHash+BTCret,new_df)
+modelbtc1 = lm(DgRet ~ BTCRV+BTCJD+DgHash+BTCret,new_df)
+summary(modelbtc1)
+
+modelbtc2 = lm(DgVol ~ BTCRV+BTCJD+BTCVol,new_df)
+summary(modelbtc2)
+
+modeleth1 = lm(DgRet ~ ETHRV+ETHJD+DgHash+ETHret,new_df)
+summary(modeleth1)
+
+modeleth2 = lm(DgVol ~ ETHRV+ETHJD+ETHVol,new_df)
+summary(modeleth2)
+
+model1m = lm(DG1m ~ BTC1m+ETH1m,new_df2)
 summary(model)
 
-model = lm(DgVol ~ BTCRV+JD+BTCVol,new_df)
-summary(model)
+# Fit models
+modelbtc1 <- lm(DgRet ~ BTCRV + BTCJD + BTCret, new_df)
+modeleth1 <- lm(DgRet ~ ETHRV + ETHJD + ETHret, new_df)
+modelfull <- lm(DgRet ~ BTCRV + BTCJD + ETHRV + ETHJD + ETHret + BTCret, new_df)
 
-#Exchanges and Sample Intervals
-intervals = c(1,5,10)
-exchange_list = c("Binance","Bitfinex","Bitstamp","Coinbase","Exmo","Gemini","HitBTC","Kraken","Okcoin") 
+modeleth2 <- lm(DgVol ~ ETHRV + ETHJD + ETHVol, new_df)
+modelbtc2 <- lm(DgVol ~ BTCRV + BTCJD + BTCVol, new_df)
+modelful2 <- lm(DgVol ~ BTCRV + BTCJD + BTCVol + ETHRV + ETHJD + ETHVol, new_df)
+
+model1m <- lm(DG1m ~ BTC1m + ETH1m, new_df2)
+
+summary(modelful2)
 
 
+
+# Generate LaTeX table
+stargazer(modelbtc1, modeleth1, modelfull,
+          title = "Regression Results: Doge Returns", 
+          label = "tab:regression_results1",
+          dep.var.labels = c("Dogecoin Returns"),
+          column.labels = c("BTC Model", "ETH Model", "Full Model"),
+          covariate.labels = c("BTCRV", "BTCJD", "BTCret", 
+                               "ETHRV", "ETHJD", "ETHret"),
+          type = "latex", 
+          digits = 3,
+          scientific = TRUE)
+
+stargazer(modelbtc2, modeleth2, modelful2,
+          title = "Regression Results: Doge Volatility", 
+          label = "tab:regression_results2",
+          dep.var.labels = c("Dogecoin 30-day Return Volatility"),
+          column.labels = c("BTC Model 2", "ETH Model 2"),
+          covariate.labels = c("BTCRV", "BTCJD", "BTCVol", 
+                               "ETHRV", "ETHJD", "ETHVol"),
+          type = "latex",
+          digits = 3,
+          scientific = TRUE)
+
+DogeHist=read.csv("dogehist.csv",header=TRUE)
+# Function to convert Vol column to numeric
+convert_volume <- function(vol) {
+  vol <- gsub("B", "e9", vol) # Replace 'B' with 'e9'
+  vol <- gsub("M", "e6", vol) # Replace 'M' with 'e6'
+  as.numeric(vol) # Convert to numeric
+}
+
+# Apply the function to the Vol column
+DogeHist <- DogeHist %>%
+  mutate(Vol = convert_volume(Vol))
+
+# Convert Date to proper Date format
+DogeHist$Date <- as.Date(DogeHist$Date, format = "%m/%d/%Y")
+
+# Create the plot
+ggplot(DogeHist, aes(x = Date)) + 
+  geom_line(aes(y = Price, color = "Price", group = 1), size = 1) +  # Add group = 1
+  geom_bar(aes(y = Vol / max(Vol, na.rm = TRUE) * max(Price, na.rm = TRUE), fill = "Volume"), 
+           stat = "identity", alpha = 0.4) +
+  scale_y_continuous(
+    name = "Price", 
+    sec.axis = sec_axis(~ . * max(DogeHist$Vol, na.rm = TRUE) / max(DogeHist$Price, na.rm = TRUE), name = "Volume")
+  ) +
+  labs(title = "Dogecoin Price and Volume", x = NULL) +  # Remove x-axis label
+  scale_color_manual(values = c("Price" = "blue")) +
+  scale_fill_manual(values = c("Volume" = "gray")) +
+  theme_minimal() +
+  theme(legend.position = "none")  # Remove legend
 
